@@ -8,7 +8,7 @@
       :message="error"
     />
 
-    <div v-else-if="session && participantId" class="container mx-auto px-4 py-8">
+    <div v-else-if="session && participantId && currentParticipant" class="container mx-auto px-4 py-8">
       <!-- Header -->
       <div class="mb-8">
         <div class="flex items-center justify-between mb-4">
@@ -17,7 +17,7 @@
               Scrum Poker Session
             </h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Round {{ session.current_round }}
+              Round {{ session.current_round }} • You are: {{ currentParticipant.nickname }}
             </p>
           </div>
           <NuxtLink
@@ -126,42 +126,67 @@ const participantId = ref<string | null>(null)
 const myVote = ref<Card | null>(null)
 const submitting = ref(false)
 const copied = ref(false)
+const joining = ref(false)
 
-// Check if participant already exists for this session
-const existingParticipant = getParticipantInfo(sessionId)
-if (existingParticipant) {
-  participantId.value = existingParticipant.participantId
-}
+// Real-time session updates - load first
+const { session, loading, error, refresh } = useRealtime(sessionId)
 
-// If no participant info, join the session
-if (!participantId.value) {
-  const { data: joinResponse, error: joinError } = await useFetch<JoinSessionResponse>(
-    `/api/session/${sessionId}/join`,
-    {
-      method: 'POST',
-      body: {}
+// Wait for session to load, then check/join participant
+watch(session, async (newSession) => {
+  if (!newSession || joining.value) return
+
+  // Check if we have a stored participant
+  const existingParticipant = getParticipantInfo(sessionId)
+
+  if (existingParticipant && newSession.participants[existingParticipant.participantId]) {
+    // Participant exists in session, use it
+    participantId.value = existingParticipant.participantId
+    console.log('Restored participant from localStorage:', existingParticipant.nickname)
+  } else if (!participantId.value && !joining.value) {
+    // Need to join the session
+    joining.value = true
+    try {
+      const response = await $fetch<JoinSessionResponse>(
+        `/api/session/${sessionId}/join`,
+        {
+          method: 'POST',
+          body: {
+            nickname: existingParticipant?.nickname // Try to preserve nickname
+          }
+        }
+      )
+
+      participantId.value = response.participantId
+      saveParticipantInfo({
+        participantId: response.participantId,
+        nickname: response.nickname,
+        sessionId
+      })
+      console.log('Joined session as:', response.nickname)
+
+      // Refresh session data to get updated participants list
+      await refresh()
+    } catch (err) {
+      console.error('Failed to join session:', err)
+    } finally {
+      joining.value = false
     }
-  )
-
-  if (joinError.value) {
-    console.error('Failed to join session:', joinError.value)
-  } else if (joinResponse.value) {
-    participantId.value = joinResponse.value.participantId
-    saveParticipantInfo({
-      participantId: joinResponse.value.participantId,
-      nickname: joinResponse.value.nickname,
-      sessionId
-    })
   }
-}
+}, { immediate: true })
 
-// Real-time session updates
-const { session, loading, error } = useRealtime(sessionId)
+// Get current participant info
+const currentParticipant = computed(() => {
+  if (!session.value || !participantId.value) return null
+  return session.value.participants[participantId.value]
+})
 
-// Presence tracking
-const { presences } = participantId.value
-  ? usePresence(sessionId, participantId.value, existingParticipant?.nickname || '')
-  : { presences: ref({}) }
+// Presence tracking - only initialize when we have participant data
+const { presences } = computed(() => {
+  if (participantId.value && currentParticipant.value) {
+    return usePresence(sessionId, participantId.value, currentParticipant.value.nickname)
+  }
+  return { presences: ref({}) }
+}).value
 
 // Computed properties
 const isCreator = computed(() => {

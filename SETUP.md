@@ -25,12 +25,19 @@ This will create:
 - Row Level Security policies (allowing public access for this app)
 - A cleanup function for expired sessions
 
-## Step 3: Enable Realtime
+## Step 3: Enable Realtime ⚠️ CRITICAL
+
+**This step is REQUIRED for the app to work properly!**
 
 1. In Supabase Dashboard, go to "Database" → "Replication"
-2. Find the `sessions` table
-3. Enable replication by toggling it ON
+2. Find the `sessions` table in the list
+3. **Toggle the switch to enable replication** (it should turn green/blue)
 4. This allows real-time updates to work via WebSocket
+
+Without this step:
+- ❌ Participant list won't update when new users join
+- ❌ Votes won't appear in real-time
+- ❌ Reveals and resets won't sync across clients
 
 ## Step 4: Start Development Server
 
@@ -60,10 +67,39 @@ The app should now be running at http://localhost:3000
 - Check that Row Level Security policies are created
 - Verify the table exists in Database → Tables
 
-### Real-time not working
-- Enable Replication for the `sessions` table in Supabase
-- Check browser console for WebSocket errors
-- Verify the ANON key is correct
+### Real-time not working (participants not updating)
+**Symptom**: When a new user joins, their name doesn't appear for others
+
+1. **Check if Realtime is enabled**:
+   - Go to Supabase Dashboard → Database → Replication
+   - Make sure the `sessions` table has replication enabled (toggle is ON)
+
+2. **Check browser console**:
+   - Open DevTools (F12) → Console tab
+   - Look for messages like "Realtime subscription status: SUBSCRIBED"
+   - If you see "CHANNEL_ERROR", Realtime is not enabled
+   - If you see "TIMED_OUT", check your network connection
+
+3. **Verify the connection**:
+   - You should see: "✅ Successfully subscribed to real-time updates"
+   - When someone joins/votes/reveals, you should see: "✅ Session updated via real-time"
+
+4. **Force refresh**:
+   - Try refreshing the page - the participant should appear after refresh
+   - If they appear after refresh but not in real-time, it's a Realtime configuration issue
+
+### Page refresh creates new user with different name
+**Symptom**: Every time you refresh, you appear as a new participant
+
+This has been **FIXED** in the latest version. The app now:
+1. Stores your participant info in browser localStorage
+2. Checks if you're still in the session when you return
+3. Preserves your nickname and participant ID across refreshes
+
+If you still see this issue:
+1. Clear your browser's localStorage (DevTools → Application → Local Storage)
+2. Hard refresh the page (Ctrl+Shift+R or Cmd+Shift+R)
+3. Check the console for "Restored participant from localStorage: YourName"
 
 ### API errors
 - Check that both public and service role keys are in `.env`

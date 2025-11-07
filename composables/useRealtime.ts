@@ -21,7 +21,7 @@ export const useRealtime = (sessionId: string) => {
       error.value = null
     } catch (err: any) {
       console.error('Failed to fetch session:', err)
-      error.value = err.message || 'Failed to fetch session'
+      error.value = err.data?.message || err.message || 'Failed to fetch session'
     } finally {
       loading.value = false
     }
@@ -29,7 +29,12 @@ export const useRealtime = (sessionId: string) => {
 
   // Subscribe to real-time updates
   const subscribe = () => {
-    if (!supabase) return
+    if (!supabase) {
+      console.error('Supabase client not available')
+      return
+    }
+
+    console.log('Subscribing to real-time updates for session:', sessionId)
 
     channel = supabase
       .channel(`session:${sessionId}`)
@@ -42,12 +47,29 @@ export const useRealtime = (sessionId: string) => {
           filter: `id=eq.${sessionId}`
         },
         (payload) => {
-          console.log('Session updated:', payload)
+          console.log('✅ Session updated via real-time:', payload.new)
           session.value = payload.new as Session
         }
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         console.log('Realtime subscription status:', status)
+        if (err) {
+          console.error('Realtime subscription error:', err)
+        }
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to real-time updates')
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Real-time channel error - check if Realtime is enabled in Supabase')
+        }
+        if (status === 'TIMED_OUT') {
+          console.error('⏱️  Real-time subscription timed out - retrying...')
+          // Retry subscription after timeout
+          setTimeout(() => {
+            unsubscribe()
+            subscribe()
+          }, 3000)
+        }
       })
   }
 
