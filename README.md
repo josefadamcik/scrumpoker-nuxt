@@ -4,7 +4,7 @@ A serverless, real-time planning poker application built with Nuxt, Vue, TypeScr
 
 ## Features
 
-- **Real-time Updates**: Instant synchronization using Supabase WebSocket
+- **Real-time Updates**: Instant synchronization using Supabase WebSocket[components](components)
 - **No Registration**: Start estimating immediately with shareable links
 - **Team Collaboration**: Support for up to 50 participants per session
 - **Privacy-Focused**: No accounts required, sessions auto-expire after 24 hours
