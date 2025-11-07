@@ -1,8 +1,20 @@
 <template>
   <div class="space-y-2">
-    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-      Participants ({{ participantCount }})
-    </h3>
+    <div class="mb-4">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+        Participants ({{ participantCount }})
+      </h3>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <span class="inline-flex items-center gap-1">
+          <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+          {{ onlineCount }} online
+        </span>
+        <span v-if="offlineCount > 0" class="ml-3 inline-flex items-center gap-1">
+          <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+          {{ offlineCount }} offline
+        </span>
+      </p>
+    </div>
 
     <div class="space-y-2">
       <div
@@ -17,15 +29,20 @@
           <!-- Presence indicator -->
           <div
             :class="[
-              'w-2 h-2 rounded-full',
-              isOnline(participant.id) ? 'bg-green-500' : 'bg-gray-400'
+              'w-2.5 h-2.5 rounded-full',
+              isOnline(participant.id) ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
             ]"
             :title="isOnline(participant.id) ? 'Online' : 'Offline'"
           />
 
           <!-- Nickname -->
           <div class="flex items-center space-x-2">
-            <span class="font-medium text-gray-900 dark:text-gray-100">
+            <span
+              :class="[
+                'font-medium',
+                isOnline(participant.id) ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'
+              ]"
+            >
               {{ participant.nickname }}
             </span>
             <span
@@ -33,6 +50,12 @@
               class="text-xs px-2 py-0.5 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300"
             >
               Host
+            </span>
+            <span
+              v-if="!isOnline(participant.id)"
+              class="text-xs px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+            >
+              Offline
             </span>
           </div>
         </div>
@@ -92,6 +115,14 @@ const sortedParticipants = computed(() => {
 })
 
 const participantCount = computed(() => Object.keys(props.participants).length)
+
+const onlineCount = computed(() => {
+  return Object.keys(props.participants).filter(id => isOnline(id)).length
+})
+
+const offlineCount = computed(() => {
+  return participantCount.value - onlineCount.value
+})
 
 const isOnline = (participantId: string) => {
   if (!props.presences) return false

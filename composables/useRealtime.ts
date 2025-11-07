@@ -2,7 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Session } from '~/types'
 
 /**
- * Composable for real-time session updates
+ * Composable for real-time session updates via Supabase Realtime
  */
 export const useRealtime = (sessionId: string) => {
   const supabase = useSupabase()
@@ -21,7 +21,7 @@ export const useRealtime = (sessionId: string) => {
       error.value = null
     } catch (err: any) {
       console.error('Failed to fetch session:', err)
-      error.value = err.message || 'Failed to fetch session'
+      error.value = err.data?.message || err.message || 'Failed to fetch session'
     } finally {
       loading.value = false
     }
@@ -29,25 +29,44 @@ export const useRealtime = (sessionId: string) => {
 
   // Subscribe to real-time updates
   const subscribe = () => {
-    if (!supabase) return
+    if (!supabase) {
+      console.error('Supabase client not available')
+      return
+    }
+
+    console.log('📡 Subscribing to real-time updates for session:', sessionId)
 
     channel = supabase
       .channel(`session:${sessionId}`)
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*', // Listen to ALL events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'sessions',
           filter: `id=eq.${sessionId}`
         },
         (payload) => {
-          console.log('Session updated:', payload)
+          console.log('🎉 Realtime event:', payload.eventType)
           session.value = payload.new as Session
         }
       )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status)
+      .subscribe((status, err) => {
+        if (err) {
+          console.error('❌ Realtime subscription error:', err)
+        }
+
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Subscribed to real-time updates')
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Real-time channel error - check Supabase configuration')
+        } else if (status === 'TIMED_OUT') {
+          console.error('⏱️  Subscription timed out - retrying...')
+          setTimeout(() => {
+            unsubscribe()
+            subscribe()
+          }, 3000)
+        }
       })
   }
 
@@ -77,3 +96,4 @@ export const useRealtime = (sessionId: string) => {
     refresh: fetchSession
   }
 }
+
