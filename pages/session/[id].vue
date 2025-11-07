@@ -123,6 +123,7 @@ const sessionId = route.params.id as string
 
 const { getParticipantInfo, saveParticipantInfo } = useParticipant()
 const participantId = ref<string | null>(null)
+const participantNickname = ref<string>('')
 const myVote = ref<Card | null>(null)
 const submitting = ref(false)
 const copied = ref(false)
@@ -131,9 +132,14 @@ const joining = ref(false)
 // Real-time session updates - load first
 const { session, loading, error, refresh } = useRealtime(sessionId)
 
+// Presence tracking - will be initialized after we have participant info
+const presencesData = ref<Record<string, any>>({})
+
 // Wait for session to load, then check/join participant
 watch(session, async (newSession) => {
-  if (!newSession || joining.value) return
+  if (!newSession || joining.value || participantId.value) return
+
+  console.log('📋 Session loaded, checking participant status...')
 
   // Check if we have a stored participant
   const existingParticipant = getParticipantInfo(sessionId)
@@ -141,10 +147,16 @@ watch(session, async (newSession) => {
   if (existingParticipant && newSession.participants[existingParticipant.participantId]) {
     // Participant exists in session, use it
     participantId.value = existingParticipant.participantId
-    console.log('Restored participant from localStorage:', existingParticipant.nickname)
-  } else if (!participantId.value && !joining.value) {
+    participantNickname.value = existingParticipant.nickname
+    console.log('✅ Restored participant from localStorage:', existingParticipant.nickname)
+
+    // Initialize presence tracking
+    initializePresence(existingParticipant.participantId, existingParticipant.nickname)
+  } else if (!participantId.value) {
     // Need to join the session
     joining.value = true
+    console.log('🚪 Joining session...')
+
     try {
       const response = await $fetch<JoinSessionResponse>(
         `/api/session/${sessionId}/join`,
@@ -157,22 +169,38 @@ watch(session, async (newSession) => {
       )
 
       participantId.value = response.participantId
+      participantNickname.value = response.nickname
       saveParticipantInfo({
         participantId: response.participantId,
         nickname: response.nickname,
         sessionId
       })
-      console.log('Joined session as:', response.nickname)
+      console.log('✅ Joined session as:', response.nickname)
+
+      // Initialize presence tracking
+      initializePresence(response.participantId, response.nickname)
 
       // Refresh session data to get updated participants list
+      console.log('🔄 Refreshing session data...')
       await refresh()
-    } catch (err) {
-      console.error('Failed to join session:', err)
+    } catch (err: any) {
+      console.error('❌ Failed to join session:', err)
     } finally {
       joining.value = false
     }
   }
 }, { immediate: true })
+
+// Initialize presence tracking
+function initializePresence(pid: string, nickname: string) {
+  console.log('👥 Initializing presence tracking for:', nickname)
+  const { presences } = usePresence(sessionId, pid, nickname)
+
+  // Watch presences and update our ref
+  watch(presences, (newPresences) => {
+    presencesData.value = newPresences
+  }, { immediate: true })
+}
 
 // Get current participant info
 const currentParticipant = computed(() => {
@@ -180,13 +208,8 @@ const currentParticipant = computed(() => {
   return session.value.participants[participantId.value]
 })
 
-// Presence tracking - only initialize when we have participant data
-const { presences } = computed(() => {
-  if (participantId.value && currentParticipant.value) {
-    return usePresence(sessionId, participantId.value, currentParticipant.value.nickname)
-  }
-  return { presences: ref({}) }
-}).value
+// Use the presences data
+const presences = computed(() => presencesData.value)
 
 // Computed properties
 const isCreator = computed(() => {
@@ -240,8 +263,9 @@ const handleVote = async (card: Card) => {
         vote: card
       }
     })
+    console.log('✅ Vote submitted:', card)
   } catch (err) {
-    console.error('Failed to submit vote:', err)
+    console.error('❌ Failed to submit vote:', err)
     myVote.value = session.value?.participants[participantId.value]?.vote || null
   } finally {
     submitting.value = false
@@ -260,8 +284,9 @@ const revealVotes = async () => {
         participantId: participantId.value
       }
     })
+    console.log('✅ Votes revealed')
   } catch (err) {
-    console.error('Failed to reveal votes:', err)
+    console.error('❌ Failed to reveal votes:', err)
   } finally {
     submitting.value = false
   }
@@ -280,8 +305,9 @@ const resetRound = async () => {
       }
     })
     myVote.value = null
+    console.log('✅ Round reset')
   } catch (err) {
-    console.error('Failed to reset round:', err)
+    console.error('❌ Failed to reset round:', err)
   } finally {
     submitting.value = false
   }
