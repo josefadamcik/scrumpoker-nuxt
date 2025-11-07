@@ -13,9 +13,17 @@
       <div class="mb-8">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-              Scrum Poker Session
-            </h1>
+            <div class="flex items-center gap-2">
+              <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                Scrum Poker Session
+              </h1>
+              <span
+                v-if="isCreator"
+                class="px-3 py-1 text-sm font-semibold rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300"
+              >
+                👑 Host
+              </span>
+            </div>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Round {{ session.current_round }} • You are: {{ currentParticipant.nickname }}
             </p>
@@ -96,6 +104,12 @@
               {{ submitting ? 'Resetting...' : 'New Round' }}
             </button>
           </div>
+
+          <!-- Vote History -->
+          <VoteHistory
+            :vote-history="session.vote_history"
+            :participants="session.participants"
+          />
         </div>
 
         <!-- Participants sidebar -->
