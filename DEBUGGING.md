@@ -50,7 +50,57 @@ TIMED_OUT → Network/connection issue
 
 ## Common Issues & Solutions
 
-### Issue 1: "CHANNEL_ERROR" in console
+### Issue 1: Subscription works but NO realtime events (MOST COMMON)
+**Symptom**:
+- Console shows "SUBSCRIBED" ✅
+- Console shows "Waiting for UPDATE events..."
+- **BUT** when you vote/reveal, you see NO "🎉 REALTIME EVENT RECEIVED" message
+- After 10 seconds: "⏰ Starting polling fallback"
+
+**This means**: Realtime is enabled but UPDATE events aren't being broadcast.
+
+**Fix - Option 1: Configure Supabase Realtime Publication**:
+
+1. **Open Supabase SQL Editor**:
+   - Go to https://supabase.com/dashboard/project/ijruhconijiksnayqlew
+   - Click **SQL Editor** → **New Query**
+
+2. **Run this SQL** to check publication:
+   ```sql
+   -- Check if realtime publication includes sessions table
+   SELECT schemaname, tablename
+   FROM pg_publication_tables
+   WHERE pubname = 'supabase_realtime';
+   ```
+
+3. **If `sessions` is NOT in the list**, run:
+   ```sql
+   -- Add sessions table to realtime publication
+   ALTER PUBLICATION supabase_realtime ADD TABLE sessions;
+   ```
+
+4. **Verify it worked**:
+   ```sql
+   -- Should now show sessions table
+   SELECT schemaname, tablename
+   FROM pg_publication_tables
+   WHERE pubname = 'supabase_realtime';
+   ```
+
+5. **Hard refresh your browser** (Ctrl+Shift+R)
+
+6. **Test**: Click reveal/vote - you should now see:
+   ```
+   🎉 REALTIME EVENT RECEIVED: {event: "UPDATE", ...}
+   ```
+
+**Fix - Option 2: Use Polling Mode** (Automatic Fallback):
+- The app now automatically switches to polling after 10 seconds
+- You'll see "⏰ Starting polling fallback (every 2 seconds)"
+- This works but is less efficient than realtime
+- UI will update every 2 seconds instead of instantly
+
+### Issue 2: "CHANNEL_ERROR" in console
 **Cause**: Supabase Realtime is not enabled
 
 **Fix**:

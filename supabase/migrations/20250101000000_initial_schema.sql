@@ -60,3 +60,7 @@ GRANT EXECUTE ON FUNCTION delete_expired_sessions() TO authenticated;
 COMMENT ON TABLE sessions IS 'Stores scrum poker sessions with 24-hour TTL';
 COMMENT ON COLUMN sessions.participants IS 'JSONB object mapping participant IDs to their data {id, nickname, vote, joinedAt}';
 COMMENT ON COLUMN sessions.vote_history IS 'Array of past voting rounds with results';
+
+-- Enable Realtime for sessions table
+-- This ensures UPDATE events are broadcast via Supabase Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE sessions;
